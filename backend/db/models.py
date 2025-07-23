@@ -20,7 +20,6 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     password: Optional[str]
     google_user_id: Optional[str]
-    google_token: Optional[str]
     user_type: Optional[str] = Field(default=UserType.NORMAL_USER, nullable=False)
     is_email_verified: bool = Field(default=False)
     is_blocked: bool = Field(default=False)
@@ -48,6 +47,7 @@ class LoginSession(SQLModel, table=True):
     notification_token: Optional[str]
     expires_at: datetime.datetime
     refresh_expires_at: datetime.datetime
+    refresh_token_jti: Optional[str]
     login_session_type: Optional[str] = Field(default=LoginSessionTypes.WINDOWS)
     is_logged_out: bool = Field(default=False)
 

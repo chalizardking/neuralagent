@@ -15,6 +15,8 @@ JWT_ISS = os.getenv('JWT_ISS')
 JWT_AUDIENCE_CLAIM = 'NeuralAgent'
 
 
+import uuid
+
 def create_token_from_user(user: User, exp: datetime.datetime, session_id: int, with_refresh: bool = True):
     """
     Create an access token and optional refresh token for a user.
@@ -31,14 +33,17 @@ def create_token_from_user(user: User, exp: datetime.datetime, session_id: int, 
 
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
     refresh_token = None
+    jti = None
 
     if with_refresh:
         refresh_exp = datetime.datetime.now(datetime.UTC) + constants.REFRESH_TOKEN_LIFETIME_DELTA
+        jti = str(uuid.uuid4())
         payload["exp"] = refresh_exp
         payload["token_type"] = "refresh"
+        payload["jti"] = jti
         refresh_token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
-    return token, refresh_token
+    return token, refresh_token, jti
 
 
 def decode_token(raw_token: str):
@@ -73,13 +78,13 @@ def is_session_valid(session_id: int, db_session: Session):
     query = select(LoginSession).where(LoginSession.id == session_id)
     result = db_session.exec(query).first()
 
-    if result and not result.is_logged_out:
+    if result and not result.is_logged_out and result.expires_at > datetime.datetime.now(datetime.UTC):
         return True
 
     return False
 
 
-def create_login_session(user: User, db_session: Session, expires_at: datetime.datetime, session_type: str = 'windows', notification_token: Optional[str] = None):
+def create_login_session(user: User, db_session: Session, expires_at: datetime.datetime, refresh_token_jti: str, session_type: str = 'windows', notification_token: Optional[str] = None):
     """
     Create a new login session in the database.
     """
@@ -89,6 +94,7 @@ def create_login_session(user: User, db_session: Session, expires_at: datetime.d
         notification_token=notification_token,
         refresh_expires_at=datetime.datetime.now(datetime.UTC) + constants.REFRESH_TOKEN_LIFETIME_DELTA,
         login_session_type=session_type,
+        refresh_token_jti=refresh_token_jti
     )
     db_session.add(session)
     db_session.commit()

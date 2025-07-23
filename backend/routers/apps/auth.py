@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlmodel import Session, select
-from db.models import User, UserType, LoginSession
-from schemas.auth import UserInfo, UserCreate, UserAuth, Logout, RefreshToken, LoginWithGoogle
+from db.models import User, UserType, LoginSession, EmailVerificationEntry
+from schemas.auth import UserInfo, UserCreate, UserAuth, RefreshToken, LoginWithGoogle
 from db.database import get_session
 from utils.security import verify_password, hash_password
 from utils.auth_helper import create_login_session, create_token_from_user, decode_token, is_session_valid
@@ -11,6 +11,7 @@ from utils.procedures import CustomError
 from dependencies.auth_dependencies import get_current_user_dependency
 import os
 import requests
+from utils.email import send_verification_email
 
 
 router = APIRouter(prefix='/apps/auth', tags=['auth'])
@@ -28,6 +29,12 @@ def login_with_email(user_auth: UserAuth, db: Session = Depends(get_session)):
             message='Invalid email or password.'
         )
 
+    if not user.is_email_verified:
+        raise CustomError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            message='Email not verified.'
+        )
+
     if user.is_blocked:
         raise CustomError(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -35,8 +42,9 @@ def login_with_email(user_auth: UserAuth, db: Session = Depends(get_session)):
         )
 
     exp = datetime.datetime.now(datetime.UTC) + constants.ACCESS_TOKEN_LIFETIME_DELTA
-    login_session = create_login_session(user, db, exp, user_auth.login_session_type)
-    token, refresh_token = create_token_from_user(user, exp, login_session.id)
+    token, refresh_token, jti = create_token_from_user(user, exp, 0) # session_id is not yet created
+    login_session = create_login_session(user, db, exp, jti, user_auth.login_session_type)
+    token, refresh_token, _ = create_token_from_user(user, exp, login_session.id)
 
     user_data = UserInfo(
         id=user.id,
@@ -70,7 +78,7 @@ def login_with_google_desktop(login_google_obj: LoginWithGoogle, db: Session = D
         )
 
         if token_res.status_code != 200:
-            raise CustomError(401, "Failed to exchange token")
+            raise CustomError(status.HTTP_401_UNAUTHORIZED, "Failed to exchange token with Google.")
 
         tokens = token_res.json()
         access_token = tokens["access_token"]
@@ -81,7 +89,7 @@ def login_with_google_desktop(login_google_obj: LoginWithGoogle, db: Session = D
         )
 
         if response.status_code != status.HTTP_200_OK:
-            raise CustomError(status.HTTP_401_UNAUTHORIZED, 'Invalid_Google_Token')
+            raise CustomError(status.HTTP_401_UNAUTHORIZED, 'Invalid Google Token.')
 
         google_user = response.json()
 
@@ -94,7 +102,6 @@ def login_with_google_desktop(login_google_obj: LoginWithGoogle, db: Session = D
             user = db.exec(select(User).where(User.email == email)).first()
             if user:
                 user.google_user_id = sub
-                user.google_token = access_token
                 user.is_email_verified = True
 
                 db.add(user)
@@ -105,7 +112,6 @@ def login_with_google_desktop(login_google_obj: LoginWithGoogle, db: Session = D
                     name=name,
                     email=email,
                     google_user_id=sub,
-                    google_token=access_token,
                     is_email_verified=True
                 )
                 db.add(user)
@@ -113,8 +119,9 @@ def login_with_google_desktop(login_google_obj: LoginWithGoogle, db: Session = D
                 db.refresh(user)
 
         exp = datetime.datetime.now(datetime.UTC) + constants.ACCESS_TOKEN_LIFETIME_DELTA
-        login_session = create_login_session(user, db, exp, login_google_obj.login_session_type)
-        token, refresh_token = create_token_from_user(user, exp, login_session.id)
+        token, refresh_token, jti = create_token_from_user(user, exp, 0) # session_id is not yet created
+        login_session = create_login_session(user, db, exp, jti, login_google_obj.login_session_type)
+        token, refresh_token, _ = create_token_from_user(user, exp, login_session.id)
 
         user_data = UserInfo(
             id=user.id,
@@ -130,8 +137,10 @@ def login_with_google_desktop(login_google_obj: LoginWithGoogle, db: Session = D
             'user': user_data,
         }
 
-    except Exception:
-        raise CustomError(status.HTTP_500_INTERNAL_SERVER_ERROR, 'Error')
+    except requests.exceptions.RequestException as e:
+        raise CustomError(status.HTTP_500_INTERNAL_SERVER_ERROR, f'Failed to connect to Google: {e}')
+    except Exception as e:
+        raise CustomError(status.HTTP_500_INTERNAL_SERVER_ERROR, f'An unexpected error occurred: {e}')
 
 
 @router.get('/user_info')
@@ -169,44 +178,61 @@ def signup(user_create: UserCreate, db: Session = Depends(get_session)):
     db.commit()
     db.refresh(new_user)
 
-    exp = datetime.datetime.now(datetime.UTC) + constants.ACCESS_TOKEN_LIFETIME_DELTA
-    login_session = create_login_session(new_user, db, exp, user_create.login_session_type)
-    token, refresh_token = create_token_from_user(new_user, exp, login_session.id)
-
-    user_data = UserInfo(
-        id=new_user.id,
-        name=new_user.name,
+    email_verification_entry = EmailVerificationEntry(
         email=new_user.email,
-        image=new_user.image,
-        is_email_verified=new_user.is_email_verified,
+        expires_at=datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)
     )
+    db.add(email_verification_entry)
+    db.commit()
+    db.refresh(email_verification_entry)
 
-    # TODO Send Email Verification
+    send_verification_email(new_user.email, email_verification_entry.verification_token)
 
     return {
-        'token': token,
-        'refresh_token': refresh_token,
-        'user': user_data,
+        'message': 'Signup successful. Please check your email to verify your account.'
+    }
+
+
+@router.post('/verify_email')
+def verify_email(token: str, db: Session = Depends(get_session)):
+    query = select(EmailVerificationEntry).where(EmailVerificationEntry.verification_token == token)
+    email_verification_entry = db.exec(query).first()
+
+    if not email_verification_entry:
+        raise CustomError(status.HTTP_400_BAD_REQUEST, 'Invalid verification token.')
+
+    if email_verification_entry.expires_at < datetime.datetime.now(datetime.UTC):
+        raise CustomError(status.HTTP_400_BAD_REQUEST, 'Verification token expired.')
+
+    user_query = select(User).where(User.email == email_verification_entry.email)
+    user = db.exec(user_query).first()
+
+    if not user:
+        raise CustomError(status.HTTP_400_BAD_REQUEST, 'User not found.')
+
+    user.is_email_verified = True
+    db.add(user)
+    db.delete(email_verification_entry)
+    db.commit()
+
+    return {
+        'message': 'Email verified successfully.'
     }
 
 
 @router.post('/logout')
-def logout(logout_obj: Logout, db: Session = Depends(get_session)):
-    payload = decode_token(logout_obj.access_token)
+def logout(db: Session = Depends(get_session), user: User = Depends(get_current_user_dependency)):
+    # The get_current_user_dependency already validates the token and session
 
-    if payload.get('token_type') != 'access':
-        raise CustomError(status.HTTP_400_BAD_REQUEST, 'Invalid_Token')
+    # We can get the session_id from the user object if needed, but for now we just invalidate all sessions for the user
+    query = select(LoginSession).where(LoginSession.user_id == user.id)
+    login_sessions = db.exec(query).all()
 
-    if not is_session_valid(payload.get('session_id'), db):
-        raise CustomError(status.HTTP_401_UNAUTHORIZED, 'Invalid_Token')
+    for login_session in login_sessions:
+        login_session.is_logged_out = True
+        db.add(login_session)
 
-    query = select(LoginSession).where(LoginSession.id == payload.get('session_id'))
-    login_session = db.exec(query).first()
-
-    login_session.is_logged_out = True
-    db.add(login_session)
     db.commit()
-    db.refresh(login_session)
 
     return {
         'message': 'Success'
@@ -218,31 +244,37 @@ def refresh_current_token(refresh_obj: RefreshToken, db: Session = Depends(get_s
     payload = decode_token(refresh_obj.refresh_token)
 
     if payload.get('token_type') != 'refresh':
-        raise CustomError(status.HTTP_400_BAD_REQUEST, 'Invalid_Token')
+        raise CustomError(status.HTTP_400_BAD_REQUEST, 'Invalid Token')
 
     if not is_session_valid(payload.get('session_id'), db):
-        raise CustomError(status.HTTP_401_UNAUTHORIZED, 'Invalid_Token')
+        raise CustomError(status.HTTP_401_UNAUTHORIZED, 'Invalid Token')
 
     u_query = select(User).where(User.id == payload.get('user_id'))
     user = db.exec(u_query).first()
 
     if not user:
-        raise CustomError(status_code=status.HTTP_401_UNAUTHORIZED, message='Invalid_Token')
+        raise CustomError(status_code=status.HTTP_401_UNAUTHORIZED, message='Invalid Token')
 
     s_query = select(LoginSession).where(LoginSession.id == payload.get('session_id'))
     login_session = db.exec(s_query).first()
 
-    exp = payload.get('exp')
-    dif = datetime.datetime.fromtimestamp(exp) - datetime.datetime.now()
-    with_refresh = dif <= datetime.timedelta(hours=1)
+    if not login_session or login_session.refresh_token_jti != payload.get('jti'):
+        # Token has been used before or is invalid
+        # Invalidate all sessions for this user as a security measure
+        user_sessions = db.exec(select(LoginSession).where(LoginSession.user_id == user.id)).all()
+        for session in user_sessions:
+            session.is_logged_out = True
+            db.add(session)
+        db.commit()
+        raise CustomError(status.HTTP_401_UNAUTHORIZED, 'Invalid Token')
+
 
     exp = datetime.datetime.now(datetime.UTC) + constants.ACCESS_TOKEN_LIFETIME_DELTA
-
-    new_token, new_refresh = create_token_from_user(user, exp, login_session.id, with_refresh)
+    new_token, new_refresh, new_jti = create_token_from_user(user, exp, login_session.id)
 
     login_session.expires_at = exp
-    if with_refresh:
-        login_session.refresh_expires_at = datetime.datetime.now(datetime.UTC) + constants.REFRESH_TOKEN_LIFETIME_DELTA
+    login_session.refresh_expires_at = datetime.datetime.now(datetime.UTC) + constants.REFRESH_TOKEN_LIFETIME_DELTA
+    login_session.refresh_token_jti = new_jti
 
     db.add(login_session)
     db.commit()
