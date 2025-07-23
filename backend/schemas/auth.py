@@ -24,6 +24,8 @@ class UserInfo(UserBase):
     is_email_verified: bool
 
 
+class Logout(BaseModel):
+    access_token: str
 
 
 class RefreshToken(BaseModel):

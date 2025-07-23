@@ -177,7 +177,20 @@ pip install -r requirements.txt
 deactivate
 ```
 
-6. **Start the Electron desktop app:**
+6. **Build the agent for your OS:**
+
+- **Windows:**
+```bash
+npm run build:agent
+npm run build:suggestor
+```
+
+- **macOS:**
+```bash
+./build_mac.sh
+```
+
+7. **Start the Electron desktop app:**
 
 ```bash
 cd ..

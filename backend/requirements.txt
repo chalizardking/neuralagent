@@ -31,4 +31,3 @@ broadcaster
 broadcaster[redis]
 asyncio-redis
 requests
-resend
