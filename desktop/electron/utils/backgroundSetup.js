@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
-import { execSync } from 'child_process';
+import { exec, execSync } from 'child_process';
 import sudo from 'sudo-prompt';
 
 const distroName = 'NeuralOS';
@@ -165,7 +165,7 @@ function verifyDistro() {
   execSync(`wsl.exe -d ${distroName} -- echo OK`);
 }
 
-export async function setupBackgroundMode({ onStatus, onProgress }) {
+async function setupBackgroundModeWindows({ onStatus, onProgress }) {
   try {
     if (!checkWindowsVersion()) {
       throw new Error('❌ NeuralAgent background mode requires Windows 10 or later.');
@@ -197,7 +197,7 @@ export async function setupBackgroundMode({ onStatus, onProgress }) {
     }
 
     // --- Import distro if needed ---
-    if (!isDistroRegistered()) {
+    if (!isDistroRegistered(distroName)) {
       log('Downloading NeuralAgent Runtime Environment...');
       await downloadImage(onProgress);
       log('Importing NeuralAgent Runtime Environment...');
@@ -217,9 +217,52 @@ export async function setupBackgroundMode({ onStatus, onProgress }) {
   }
 }
 
+async function setupBackgroundModeMac({ onStatus, onProgress }) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.resolve(__dirname, '..', 'aiagent', 'background_mode', 'install_mac.sh');
+    const process = exec(`bash "${scriptPath}"`);
+
+    process.stdout.on('data', (data) => {
+      onStatus?.(data.toString());
+    });
+
+    process.stderr.on('data', (data) => {
+      onStatus?.(data.toString());
+    });
+
+    process.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true });
+      } else {
+        reject({ success: false, error: `Script failed with code ${code}` });
+      }
+    });
+  });
+}
+
+export async function setupBackgroundMode(options) {
+  if (process.platform === 'win32') {
+    return setupBackgroundModeWindows(options);
+  } else if (process.platform === 'darwin') {
+    return setupBackgroundModeMac(options);
+  } else {
+    return { success: false, error: 'Operating system not supported' };
+  }
+}
+
+function isBackgroundModeReadyMac() {
+  // How to check if the dependencies are installed?
+  // For now, just return true and let the user handle it.
+  return true;
+}
 
 export function isBackgroundModeReady() {
-  return checkWindowsVersion() &&
-    isWSLInstalled() &&
-    isDistroRegistered('NeuralOS');
+  if (process.platform === 'win32') {
+    return checkWindowsVersion() &&
+      isWSLInstalled() &&
+      isDistroRegistered('NeuralOS');
+  } else if (process.platform === 'darwin') {
+    return isBackgroundModeReadyMac();
+  }
+  return false;
 }

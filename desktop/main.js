@@ -11,7 +11,7 @@ import kill from 'tree-kill';
 import url from 'url';
 import http from 'http';
 import { v4 as uuidv4 } from 'uuid';
-import { setupBackgroundMode, isBackgroundModeReady } from './electron/utils/wslSetup.js';
+import { setupBackgroundMode, isBackgroundModeReady } from './electron/utils/backgroundSetup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -233,10 +233,16 @@ ipcMain.on('launch-ai-agent', async (_, baseURL, threadId, backgroundMode) => {
       PYTHONUTF8: '1',
     };
 
-    const shellCommand = Object.entries(envVars)
-      .map(([k, v]) => `${k}="${v}"`).join(' ') + ' bash /agent/launch_bg_agent.sh';
-
-    aiagentProcess = spawn('wsl', ['-d', 'NeuralOS', '--', 'bash', '-c', shellCommand]);
+    if (isMac) {
+        const scriptPath = path.resolve(__dirname, 'aiagent', 'background_mode', 'launch_bg_agent_mac.sh');
+        aiagentProcess = spawn('bash', [scriptPath], {
+            env: { ...process.env, ...envVars },
+        });
+    } else {
+        const shellCommand = Object.entries(envVars)
+          .map(([k, v]) => `${k}="${v}"`).join(' ') + ' bash /agent/launch_bg_agent.sh';
+        aiagentProcess = spawn('wsl', ['-d', 'NeuralOS', '--', 'bash', '-c', shellCommand]);
+    }
 
     launchBackgroundAgentWindow();
   }
