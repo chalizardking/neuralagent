@@ -22,7 +22,7 @@
 
 - ✅ Desktop automation with `pyautogui`
 - ✅ Background automation (Windows Only For Now) via WSL (browser-only).
-- ✅ Supports Claude, GPT-4, Azure OpenAI, and Bedrock
+- ✅ Supports Claude, GPT-4, Azure OpenAI, Bedrock, Ollama, and NVIDIA API
 - ✅ Modular agents: Planner, Classifier, Suggestor, Title, and more
 - ✅ Multimodal (text + vision)
 - ✅ FastAPI backend + Electron + React frontend
@@ -97,20 +97,27 @@ OPENAI_API_VERSION=2024-12-01-preview
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 
+# Optional: Ollama (local models)
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Optional: NVIDIA API
+NVIDIA_API_KEY=
+NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+
 # Model config per agent
-CLASSIFIER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock
+CLASSIFIER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|nvidia
 CLASSIFIER_AGENT_MODEL_ID=gpt-4.1
 
-TITLE_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock
+TITLE_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|nvidia
 TITLE_AGENT_MODEL_ID=gpt-4.1-nano
 
-SUGGESTOR_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock
+SUGGESTOR_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|nvidia
 SUGGESTOR_AGENT_MODEL_ID=gpt-4.1-mini
 
-PLANNER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock
+PLANNER_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|nvidia
 PLANNER_AGENT_MODEL_ID=gpt-4.1
 
-COMPUTER_USE_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock
+COMPUTER_USE_AGENT_MODEL_TYPE=openai|azure_openai|anthropic|bedrock|ollama|nvidia
 COMPUTER_USE_AGENT_MODEL_ID=us.anthropic.claude-sonnet-4-20250514-v1:0
 
 LANGCHAIN_TRACING_V2=false
@@ -188,7 +195,7 @@ npm start
 
 ## 🤖 Agents & Model Providers
 
-You can configure different model providers (`OpenAI`, `Azure OpenAI`, `Anthropic`, `Bedrock`) per agent in `.env`.  
+You can configure different model providers (`OpenAI`, `Azure OpenAI`, `Anthropic`, `Bedrock`, `Ollama`, `NVIDIA`) per agent in `.env`.  
 Agent types include:
 
 - `PLANNER_AGENT`
