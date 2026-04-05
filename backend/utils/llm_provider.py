@@ -5,6 +5,7 @@ from botocore.config import Config
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_aws import ChatBedrockConverse
 from langchain_anthropic import ChatAnthropic
+from langchain_ollama import ChatOllama
 from langchain_core.language_models.chat_models import BaseChatModel
 
 load_dotenv()  # Load env variables from .env
@@ -94,6 +95,17 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
                 config=boto3_config,
                 region_name=os.getenv("BEDROCK_REGION", "us-east-1")
             )
+
+    elif model_type == "ollama":
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        kwargs = dict(
+            model=model_id,
+            base_url=ollama_base_url,
+            temperature=temperature,
+        )
+        if max_tokens is not None:
+            kwargs["num_predict"] = max_tokens
+        return ChatOllama(**kwargs)
 
     else:
         raise ValueError(f"Unsupported model type '{model_type}' for agent '{agent}'")
