@@ -21,6 +21,7 @@ langchain-openai
 langchain-aws
 langchain-azure-ai
 langchain-anthropic
+langchain-ollama
 anthropic
 youtube-transcript-api
 beautifulsoup4
