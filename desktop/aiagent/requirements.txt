@@ -7,11 +7,9 @@ nuitka
 pyperclip
 httpx
 websockets
-pywin32
+pywin32; sys_platform == "win32"
 psutil
-# pywinsandbox
-uiautomation
-pyobjc
-pyobjc-framework-Quartz
-pyobjc-framework-Accessibility
-# pyatspi
+uiautomation; sys_platform == "win32"
+pyobjc; sys_platform == "darwin"
+pyobjc-framework-Quartz; sys_platform == "darwin"
+pyobjc-framework-Accessibility; sys_platform == "darwin"
