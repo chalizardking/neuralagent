@@ -29,16 +29,21 @@
     "files": [
       "main.js",
       "electron/**/*",
-      "neuralagent-app/build/**/*"
+      "neuralagent-app/build/**/*",
+      "!node_modules/**/*",
+      "!neuralagent-app/node_modules/**/*"
     ],
     "mac": {
       "target": [
         {
           "target": "dmg",
-          "arch": "arm64"
+          "arch": ["arm64", "x64"]
         }
       ],
       "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "asar": true,
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "extraResources": [
         {
           "from": "agent_build/mac/agent",
@@ -47,6 +52,21 @@
         {
           "from": "agent_build/mac/suggestor",
           "to": "suggestor"
+        }
+      ]
+    },
+    "dmg": {
+      "title": "${productName}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
         }
       ]
     },

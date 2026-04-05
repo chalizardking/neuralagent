@@ -73,6 +73,9 @@ ipcMain.on('minimize-overlay', () => {
 });
 
 ipcMain.handle('check-background-ready', () => {
+  if (process.platform !== 'win32') {
+    return false;
+  }
   return isBackgroundModeReady();
 });
 
