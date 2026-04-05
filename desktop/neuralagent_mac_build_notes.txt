@@ -1,8 +1,62 @@
-Update extraResources in package.json to:
+# NeuralAgent macOS Build Notes
 
-"extraResources": [
-    {
-    "from": "agent_build/mac/agent",
-    "to": "agent"
-    }
-],
+## Prerequisites
+
+1. Node.js and npm installed
+2. Python 3.x with virtual environment support
+3. PyInstaller: `pip install pyinstaller`
+
+## Build Steps
+
+### 1. Build the Python Agents (agent and suggestor)
+
+```bash
+# Create and activate virtual environment
+cd aiagent
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Build agent for macOS
+npm run build:agent:mac
+
+# Build suggestor for macOS
+npm run build:suggestor:mac
+```
+
+This will create:
+- `agent_build/mac/agent` - Main AI agent executable
+- `agent_build/mac/suggestor` - Suggestor executable
+
+### 2. Build the Electron Application
+
+```bash
+cd desktop
+npm install
+npm run build
+```
+
+This will create the DMG installer in `dist/`.
+
+## Configuration
+
+The macOS build configuration in `package.json` includes:
+- DMG target for both arm64 and x64 architectures
+- Extra resources for agent and suggestor executables
+- Proper icon configuration (requires icon.icns)
+
+## Running in Development
+
+```bash
+npm run start
+```
+
+This will start both the React dev server and Electron app.
+
+## Troubleshooting
+
+- If DMG build fails, ensure you have created the agent_build/mac directory with the compiled binaries
+- For icon issues, convert icon.png to icon.icns using a tool like iconutil
+- The agent and suggestor must be compiled before running the full build
