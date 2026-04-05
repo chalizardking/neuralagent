@@ -11,5 +11,7 @@ pywin32
 psutil
 # pywinsandbox
 uiautomation
-# pyobjc
+pyobjc
+pyobjc-framework-Quartz
+pyobjc-framework-Accessibility
 # pyatspi
