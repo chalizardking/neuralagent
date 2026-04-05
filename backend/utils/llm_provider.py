@@ -107,5 +107,22 @@ def get_llm(agent: str, temperature: float = 0.0, max_tokens: int = None, thinki
             kwargs["num_predict"] = max_tokens
         return ChatOllama(**kwargs)
 
+    elif model_type == "nvidia":
+        nvidia_api_key = os.getenv("NVIDIA_API_KEY")
+        nvidia_base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+
+        if not nvidia_api_key:
+            raise ValueError(f"NVIDIA_API_KEY is required for agent: {agent}")
+
+        return ChatOpenAI(
+            model=model_id,
+            api_key=nvidia_api_key,
+            base_url=nvidia_base_url,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=None,
+            max_retries=2
+        )
+
     else:
         raise ValueError(f"Unsupported model type '{model_type}' for agent '{agent}'")
