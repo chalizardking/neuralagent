@@ -12,8 +12,10 @@
     "react-build": "cd neuralagent-app && npm run build",
     "build:agent": "\"aiagent\\venv\\Scripts\\pyinstaller\" --clean --noconfirm --onefile --name agent --distpath agent_build/ aiagent/main.py",
     "build:suggestor": "\"aiagent\\venv\\Scripts\\pyinstaller\" --clean --noconfirm --onefile --name suggestor --distpath agent_build/ aiagent/suggestor.py",
-    "build:agent:nuitko": "\"aiagent\\venv\\Scripts\\nuitka\" ---standalone --onefile --lto=no --output-dir=agent_build/ --output-filename=agent --assume-yes-for-downloads --include-package=comtypes aigent/main.py",
-    "build:suggestor:nuitko": "\"aiagent\\venv\\Scripts\\nuitka\" ---standalone --onefile --lto=no --output-dir=agent_build/ --output-filename=suggestor --assume-yes-for-downloads --include-package=comtypes aigent/suggestor.py",
+    "build:agent:mac": "aiagent/venv/bin/pyinstaller --clean --noconfirm --onefile --name agent --distpath agent_build/mac/ aiagent/main.py",
+    "build:suggestor:mac": "aiagent/venv/bin/pyinstaller --clean --noconfirm --onefile --name suggestor --distpath agent_build/mac/ aiagent/suggestor.py",
+    "build:agent:nuitka": "\"aiagent\\venv\\Scripts\\nuitka\" --standalone --onefile --lto=no --output-dir=agent_build/ --output-filename=agent --assume-yes-for-downloads --include-package=comtypes aiagent/main.py",
+    "build:suggestor:nuitka": "\"aiagent\\venv\\Scripts\\nuitka\" --standalone --onefile --lto=no --output-dir=agent_build/ --output-filename=suggestor --assume-yes-for-downloads --include-package=comtypes aiagent/suggestor.py",
     "build": "npm run react-build && electron-builder",
     "dev": "electron ."
   },
@@ -29,16 +31,6 @@
       "electron/**/*",
       "neuralagent-app/build/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "agent_build/agent.exe",
-        "to": "agent.exe"
-      },
-      {
-        "from": "agent_build/suggestor.exe",
-        "to": "suggestor.exe"
-      }
-    ],
     "mac": {
       "target": [
         {
@@ -46,10 +38,30 @@
           "arch": "arm64"
         }
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "extraResources": [
+        {
+          "from": "agent_build/mac/agent",
+          "to": "agent"
+        },
+        {
+          "from": "agent_build/mac/suggestor",
+          "to": "suggestor"
+        }
+      ]
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "extraResources": [
+        {
+          "from": "agent_build/agent.exe",
+          "to": "agent.exe"
+        },
+        {
+          "from": "agent_build/suggestor.exe",
+          "to": "suggestor.exe"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
