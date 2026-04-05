@@ -37,7 +37,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
       "category": "public.app-category.productivity",
@@ -97,7 +100,7 @@
   "devDependencies": {
     "concurrently": "^9.1.2",
     "electron": "^35.2.0",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^26.8.1",
     "wait-on": "^8.0.3"
   },
   "dependencies": {
