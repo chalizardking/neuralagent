@@ -34,12 +34,13 @@ def get_suggestions(request: SuggestorRequest, db: Session = Depends(get_session
         ThreadTask.thread.has(Thread.user_id == user.id),
         ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
     )).order_by(ThreadTask.created_at.desc()).limit(20)).all()
-    most_recent_tasks_arr = []
-    for recent_task in most_recent_tasks:
-        most_recent_tasks_arr.append({
+    most_recent_tasks_arr = [
+        {
             'task': recent_task.task_text,
             'status': recent_task.status,
-        })
+        }
+        for recent_task in most_recent_tasks
+    ]
 
     if len(most_recent_tasks_arr) > 0:
         prompt_blocks.append({
