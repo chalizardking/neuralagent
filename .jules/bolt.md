@@ -1,0 +1,3 @@
+## 2024-04-07 - Database Existence Checking Anti-Pattern
+**Learning:** Found a common backend anti-pattern where `.all()` was being called on querysets purely to check length (e.g. `len(queryset.all()) > 0`) to see if records exist. This loads every matching row into Python memory when only a boolean answer is needed.
+**Action:** Replace `len(queryset.all()) > 0` with `queryset.first() is not None` when checking for existence in SQLAlchemy/SQLModel. This limits the query to fetching a single row, saving massive memory and DB compute on large unpaginated tables.
