@@ -38,7 +38,10 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
     )))
-    if len(working_threads.all()) > 0:
+    # What: Replaced len(query.all()) > 0 with query.first() is not None
+    # Why: Avoids loading the entire dataset into memory just to check for existence
+    # Impact: Reduces memory usage and database query time, especially for users with many threads
+    if working_threads.first() is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
@@ -288,7 +291,10 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
     )))
-    if len(working_threads.all()) > 0:
+    # What: Replaced len(query.all()) > 0 with query.first() is not None
+    # Why: Avoids loading the entire dataset into memory just to check for existence
+    # Impact: Reduces memory usage and database query time, especially for users with many threads
+    if working_threads.first() is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
