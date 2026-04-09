@@ -1,0 +1,3 @@
+## 2024-04-10 - [SQLModel Existence Check Optimization]
+**Learning:** In the current architecture using SQLModel, using `len(query.all()) > 0` to check for existence causes the database to load the entire dataset into memory. Also calling `.first()` on `db.exec(select(...))` without explicitly limiting the SQL query using `.limit(1)` within the `select` statement still results in the database scanning and fetching all matched rows.
+**Action:** When performing an existence check, always append `.limit(1)` to the `select` statement explicitly before calling `db.exec()`, and then use `.first() is not None` to genuinely minimize both database query execution time and application memory use.
