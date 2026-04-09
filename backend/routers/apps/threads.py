@@ -37,8 +37,11 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
     working_threads = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1))
+    # What: Replaced full query fetch with a query limited to 1 result and checked first()
+    # Why: Stops the database from scanning more rows than necessary and avoids loading full datasets into memory just to check for existence
+    # Impact: Significantly reduces memory usage and database query execution time
+    if working_threads.first() is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
@@ -287,8 +290,11 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
     working_threads = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1))
+    # What: Replaced full query fetch with a query limited to 1 result and checked first()
+    # Why: Stops the database from scanning more rows than necessary and avoids loading full datasets into memory just to check for existence
+    # Impact: Significantly reduces memory usage and database query execution time
+    if working_threads.first() is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
