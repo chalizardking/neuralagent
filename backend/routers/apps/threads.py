@@ -34,11 +34,14 @@ def list_threads(db: Session = Depends(get_session), user: User = Depends(get_cu
 def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_session),
                   user: User = Depends(get_current_user_dependency)):
 
-    working_threads = db.exec(select(Thread).where(and_(
+    # 💡 What: Replaced len(query.all()) > 0 with query.limit(1).first() is not None
+    # 🎯 Why: Using len(query.all()) executes a full table scan and loads all objects into memory just to check existence.
+    # 📊 Impact: O(1) query time and minimal memory usage compared to O(N) where N is the number of rows matching the condition.
+    working_thread = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1)).first()
+    if working_thread is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
@@ -284,11 +287,14 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
     if not instance:
         raise CustomError(status.HTTP_404_NOT_FOUND, 'Thread not found')
 
-    working_threads = db.exec(select(Thread).where(and_(
+    # 💡 What: Replaced len(query.all()) > 0 with query.limit(1).first() is not None
+    # 🎯 Why: Using len(query.all()) executes a full table scan and loads all objects into memory just to check existence.
+    # 📊 Impact: O(1) query time and minimal memory usage compared to O(N) where N is the number of rows matching the condition.
+    working_thread = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1)).first()
+    if working_thread is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
