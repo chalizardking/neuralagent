@@ -1,0 +1,3 @@
+## 2024-05-18 - [Avoid SQLModel .all() memory leaks for existence check]
+**Learning:** Checking for existence using `len(query.all()) > 0` causes SQLModel/SQLAlchemy to fetch all rows into memory and build ORM objects for them. This is memory-intensive and slow, especially for large datasets. Furthermore, even using `db.exec(select(...)).first()` does not prevent the full query from running behind the scenes.
+**Action:** When performing existence checks with SQLModel/SQLAlchemy, always explicitly append `.limit(1)` to the select statement before executing, and then call `.first()`, like `db.exec(select(...).limit(1)).first() is not None`.
