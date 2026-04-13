@@ -34,11 +34,14 @@ def list_threads(db: Session = Depends(get_session), user: User = Depends(get_cu
 def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_session),
                   user: User = Depends(get_current_user_dependency)):
 
-    working_threads = db.exec(select(Thread).where(and_(
+    # What: Replace `len(db.exec(...).all()) > 0` with `.limit(1)).first() is not None`
+    # Why: Avoids fetching and constructing objects for all matching rows when we only need to know if at least one exists
+    # Impact: O(1) query time vs O(N) where N is number of working threads, reducing DB load and application memory usage
+    working_threads_exist = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1)).first() is not None
+    if working_threads_exist:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
@@ -284,11 +287,14 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
     if not instance:
         raise CustomError(status.HTTP_404_NOT_FOUND, 'Thread not found')
 
-    working_threads = db.exec(select(Thread).where(and_(
+    # What: Replace `len(db.exec(...).all()) > 0` with `.limit(1)).first() is not None`
+    # Why: Avoids fetching and constructing objects for all matching rows when we only need to know if at least one exists
+    # Impact: O(1) query time vs O(N) where N is number of working threads, reducing DB load and application memory usage
+    working_threads_exist = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1)).first() is not None
+    if working_threads_exist:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
