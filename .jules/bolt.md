@@ -1,0 +1,4 @@
+
+## 2024-05-18 - [Inefficient ORM Query Length Check]
+**Learning:** Found multiple instances where `len(db.exec(select(...)).all()) > 0` was used to check for existence of records, specifically in `backend/routers/apps/threads.py` to prevent duplicate running threads. This pulls all matching database records into memory as objects only to measure the list length, wasting database bandwidth and application memory, creating a significant latency trap (O(N)) when only O(1) was necessary.
+**Action:** Replaced these occurrences with `.limit(1).first() is not None` which runs efficiently on the database level and returns at most one object. To apply next time: search for `.all()` usage in similar contexts (e.g. `routers/aiagent/*`) and replace with bounded queries where only existence is needed.
