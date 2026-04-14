@@ -1,0 +1,3 @@
+## 2024-06-25 - Avoid full DB loads for existence checks
+**Learning:** Found an anti-pattern in the codebase where `len(query.all()) > 0` was used to check for existence of records (e.g. `working_threads`), loading potentially many records into memory. Furthermore, just calling `.first()` on the result without a `limit(1)` modifier on the query object itself does not prevent the underlying database query from being unconstrained in SQLAlchemy/SQLModel.
+**Action:** Always ensure that when checking for existence, the `limit(1)` is explicitly applied *before* executing the query in the `db.exec(select(...).limit(1))` block, and then use `.first() is not None` to minimize both DB and application overhead.
