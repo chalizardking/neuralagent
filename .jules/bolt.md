@@ -1,0 +1,3 @@
+## 2023-10-25 - Replace `len(query.all()) > 0` with existence check
+**Learning:** In the backend FastAPI app utilizing SQLModel/SQLAlchemy, a common anti-pattern was found where checking for existence was done using `len(query.all()) > 0`. This is inefficient because it fetches all matching rows into memory from the database. A more optimal approach is to explicitly limit the query before execution and check the first result, e.g., `query.limit(1).first() is not None`.
+**Action:** When inspecting backend routing logic (especially related to status checks or pre-conditions), ensure that existence checks are properly limited in the query rather than fetching all rows.
