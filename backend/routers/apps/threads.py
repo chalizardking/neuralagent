@@ -37,8 +37,13 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
     working_threads = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1))
+
+    # ⚡ Bolt Optimization: Replace full query with existence check
+    # What: Replaced len(working_threads.all()) > 0 with .first() is not None and appended .limit(1) to the query.
+    # Why: The previous approach fetched all matching rows from the database into memory just to check if any exist, which is an N+1/ORM anti-pattern.
+    # Impact: Significantly reduces memory usage and database load by only fetching a single row instead of all matching rows.
+    if working_threads.first() is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
@@ -287,8 +292,13 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
     working_threads = db.exec(select(Thread).where(and_(
         Thread.user_id == user.id,
         Thread.status == ThreadStatus.WORKING
-    )))
-    if len(working_threads.all()) > 0:
+    )).limit(1))
+
+    # ⚡ Bolt Optimization: Replace full query with existence check
+    # What: Replaced len(working_threads.all()) > 0 with .first() is not None and appended .limit(1) to the query.
+    # Why: The previous approach fetched all matching rows from the database into memory just to check if any exist, which is an N+1/ORM anti-pattern.
+    # Impact: Significantly reduces memory usage and database load by only fetching a single row instead of all matching rows.
+    if working_threads.first() is not None:
         raise CustomError(status.HTTP_400_BAD_REQUEST, 'Running_Thread')
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
