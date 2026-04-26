@@ -117,6 +117,10 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
+        # ⚡ Bolt Optimization: Batch database commits for subtask creation
+        # What: Moved db.commit() outside the loop and removed db.refresh(subtask)
+        # Why: Prevents N database transactions (one for each subtask in the plan)
+        # Impact: Reduces N db transactions to 1, significantly lowering latency during plan creation
         for i, subtask_item in enumerate(plan):
             subtask = PlanSubtask(
                 thread_task_plan_id=current_plan.id,
@@ -127,8 +131,7 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
                 ordering=i + 1,
             )
             db.add(subtask)
-            db.commit()
-            db.refresh(subtask)
+        db.commit()
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,

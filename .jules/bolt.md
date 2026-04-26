@@ -1,3 +1,6 @@
 ## 2024-05-24 - [Avoid `len(query.all()) > 0` for SQLModel existence checks]
 **Learning:** Checking for existence using `len(query.all()) > 0` in SQLModel/SQLAlchemy will fully execute the query and load all matching models into memory, leading to an N+1 memory footprint. Also learned from codebase context that calling `.first()` on the result object without `.limit(1)` in this setup fails to prevent full database queries.
 **Action:** Always append `.limit(1)` to the `select()` statement before execution (e.g., `db.exec(select(...).limit(1)).first() is not None`) to ensure the DB limits the scan natively.
+## 2024-05-24 - [Avoid `db.commit()` and `db.refresh()` inside creation loops]
+**Learning:** Found a classic N+1 database operations pattern in `backend/routers/aiagent/generic.py` where subtasks were being added, committed, and refreshed individually inside a loop. Since `db.refresh()` incurs unnecessary database I/O when the refreshed attributes (like generated IDs) aren't immediately consumed in the loop, moving the commit outside the loop and removing the refresh drastically reduces overhead.
+**Action:** Always prefer batching database insertions by calling `db.add()` inside loops and a single `db.commit()` outside the loop. Avoid `db.refresh()` unless the generated attributes are strictly needed in subsequent operations within the same transaction.
