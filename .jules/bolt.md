@@ -1,3 +1,6 @@
 ## 2024-05-24 - [Avoid `len(query.all()) > 0` for SQLModel existence checks]
 **Learning:** Checking for existence using `len(query.all()) > 0` in SQLModel/SQLAlchemy will fully execute the query and load all matching models into memory, leading to an N+1 memory footprint. Also learned from codebase context that calling `.first()` on the result object without `.limit(1)` in this setup fails to prevent full database queries.
 **Action:** Always append `.limit(1)` to the `select()` statement before execution (e.g., `db.exec(select(...).limit(1)).first() is not None`) to ensure the DB limits the scan natively.
+## 2024-06-25 - [SQLAlchemy Redundant db.refresh]
+**Learning:** In the FastAPI/SQLModel backend, several endpoints perform multiple consecutive DB inserts, calling `db.commit()` followed by `db.refresh()` for each object. However, `db.refresh()` forces a SELECT query. For objects that are completely out of scope and never accessed before the endpoint returns (like `user_message`), this refresh is wasted I/O.
+**Action:** When working in `backend/routers`, review endpoint logic for `db.refresh()` calls right before returning. If the object attributes are not accessed after commit, remove the refresh to save a database roundtrip.
