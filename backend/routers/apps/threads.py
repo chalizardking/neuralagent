@@ -90,7 +90,9 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
     )
     db.add(user_message)
     db.commit()
-    db.refresh(user_message)
+    # ⚡ Bolt Optimization: Removed redundant db.refresh()
+    # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+    # 📊 Impact: Reduces database query overhead per endpoint execution.
 
     response_data['thread_id'] = instance.id
 
@@ -114,12 +116,16 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
         )
         db.add(ai_message)
         db.commit()
-        db.refresh(ai_message)
+        # ⚡ Bolt Optimization: Removed redundant db.refresh()
+        # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+        # 📊 Impact: Reduces database query overhead.
 
         instance.status = ThreadStatus.WORKING
         db.add(instance)
         db.commit()
-        db.refresh(instance)
+        # ⚡ Bolt Optimization: Removed redundant db.refresh()
+        # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+        # 📊 Impact: Reduces database query overhead.
 
         return response_data
     else:
@@ -131,7 +137,9 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
         )
         db.add(ai_message)
         db.commit()
-        db.refresh(ai_message)
+        # ⚡ Bolt Optimization: Removed redundant db.refresh()
+        # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+        # 📊 Impact: Reduces database query overhead.
 
         return response_data
 
@@ -150,7 +158,9 @@ def update_thread(tid: str, update_obj: UpdateThread, db: Session = Depends(get_
     instance.title = update_obj.title
     db.add(instance)
     db.commit()
-    db.refresh(instance)
+    # ⚡ Bolt Optimization: Removed redundant db.refresh()
+    # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+    # 📊 Impact: Reduces database query overhead.
 
     return {'message': 'Success'}
 
@@ -172,7 +182,9 @@ def delete_thread(tid: str, db: Session = Depends(get_session), user: User = Dep
     instance.status = ThreadStatus.DELETED
     db.add(instance)
     db.commit()
-    db.refresh(instance)
+    # ⚡ Bolt Optimization: Removed redundant db.refresh()
+    # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+    # 📊 Impact: Reduces database query overhead.
 
     return {'message': 'Success'}
 
@@ -240,7 +252,9 @@ def cancel_running_task(tid: str, db: Session = Depends(get_session), user: User
     instance.status = ThreadStatus.STANDBY
     db.add(instance)
     db.commit()
-    db.refresh(instance)
+    # ⚡ Bolt Optimization: Removed redundant db.refresh()
+    # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+    # 📊 Impact: Reduces database query overhead.
 
     running_task = db.exec(select(ThreadTask).where(and_(
         ThreadTask.thread_id == tid,
@@ -270,7 +284,9 @@ def cancel_running_task(tid: str, db: Session = Depends(get_session), user: User
     )
     db.add(ai_message)
     db.commit()
-    db.refresh(ai_message)
+    # ⚡ Bolt Optimization: Removed redundant db.refresh()
+    # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+    # 📊 Impact: Reduces database query overhead.
 
     return {'message': 'Success'}
 
@@ -334,7 +350,9 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
     )
     db.add(user_message)
     db.commit()
-    db.refresh(user_message)
+    # ⚡ Bolt Optimization: Removed redundant db.refresh()
+    # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+    # 📊 Impact: Reduces database query overhead per endpoint execution.
 
     if response_data.get('type') == 'desktop_task':
         thread_task = ThreadTask(
@@ -356,12 +374,16 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
         )
         db.add(ai_message)
         db.commit()
-        db.refresh(ai_message)
+        # ⚡ Bolt Optimization: Removed redundant db.refresh()
+        # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+        # 📊 Impact: Reduces database query overhead.
 
         instance.status = ThreadStatus.WORKING
         db.add(instance)
         db.commit()
-        db.refresh(instance)
+        # ⚡ Bolt Optimization: Removed redundant db.refresh()
+        # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+        # 📊 Impact: Reduces database query overhead.
 
         return response_data
     else:
@@ -373,6 +395,8 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
         )
         db.add(ai_message)
         db.commit()
-        db.refresh(ai_message)
+        # ⚡ Bolt Optimization: Removed redundant db.refresh()
+        # 💡 Why: The refreshed attributes are not consumed after commit, avoiding unnecessary database I/O.
+        # 📊 Impact: Reduces database query overhead.
 
         return response_data
