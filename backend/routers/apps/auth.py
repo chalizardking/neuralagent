@@ -206,7 +206,7 @@ def logout(logout_obj: Logout, db: Session = Depends(get_session)):
     login_session.is_logged_out = True
     db.add(login_session)
     db.commit()
-    db.refresh(login_session)
+    # db.refresh(login_session) removed to save DB I/O (attributes not accessed before return)
 
     return {
         'message': 'Success'
@@ -246,7 +246,7 @@ def refresh_current_token(refresh_obj: RefreshToken, db: Session = Depends(get_s
 
     db.add(login_session)
     db.commit()
-    db.refresh(login_session)
+    # db.refresh(login_session) removed to save DB I/O (attributes not accessed before return)
 
     return {
         'new_token': new_token,

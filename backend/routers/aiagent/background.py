@@ -164,7 +164,7 @@ def next_step(tid: str, next_step_req: BackgroundNextStepRequest, db: Session = 
                 )
                 db.add(thinking_message)
                 db.commit()
-                db.refresh(thinking_message)
+                # db.refresh(thinking_message) removed to save DB I/O (attributes not accessed before return)
             elif response_item.get('type') == 'text':
                 response_data = extract_json(response_item.get('text'))
     else:
@@ -179,7 +179,7 @@ def next_step(tid: str, next_step_req: BackgroundNextStepRequest, db: Session = 
     )
     db.add(ai_message)
     db.commit()
-    db.refresh(ai_message)
+    # db.refresh(ai_message) removed to save DB I/O (attributes not accessed before return)
 
     if response_data.get('current_state', {}).get('save_to_memory', False):
         memory_text = response_data['current_state'].get('memory')
@@ -228,7 +228,7 @@ def next_step(tid: str, next_step_req: BackgroundNextStepRequest, db: Session = 
             instance.status = ThreadStatus.STANDBY
             db.add(instance)
             db.commit()
-            db.refresh(instance)
+            # db.refresh(instance) removed to save DB I/O (attributes not accessed before return)
 
             # ai_message = ThreadMessage(
             #     thread_id=instance.id,
@@ -262,6 +262,6 @@ def next_step(tid: str, next_step_req: BackgroundNextStepRequest, db: Session = 
                 )
                 db.add(memory_entry)
                 db.commit()
-                db.refresh(memory_entry)
+                # db.refresh(memory_entry) removed to save DB I/O (attributes not accessed before return)
 
     return response_data
