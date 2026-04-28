@@ -108,7 +108,7 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         )
         db.add(plan_ai_message)
         db.commit()
-        db.refresh(plan_ai_message)
+        # db.refresh(plan_ai_message) removed to save DB I/O (attributes not accessed before return)
 
         current_plan = ThreadTaskPlan(
             thread_task_id=task.id,
@@ -128,7 +128,7 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
             )
             db.add(subtask)
             db.commit()
-            db.refresh(subtask)
+            # db.refresh(subtask) removed to save DB I/O (attributes not accessed before return)
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
@@ -139,7 +139,7 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         current_plan.status = ThreadTaskPlanStatus.COMPLETED
         db.add(current_plan)
         db.commit()
-        db.refresh(current_plan)
+        # db.refresh(current_plan) removed to save DB I/O (attributes not accessed before return)
 
         task.status = ThreadTaskStatus.COMPLETED
         db.add(task)
@@ -160,7 +160,7 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         )
         db.add(ai_message)
         db.commit()
-        db.refresh(ai_message)
+        # db.refresh(ai_message) removed to save DB I/O (attributes not accessed before return)
 
         return {'action': 'task_completed'}
 
@@ -327,7 +327,7 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
                 )
                 db.add(thinking_message)
                 db.commit()
-                db.refresh(thinking_message)
+                # db.refresh(thinking_message) removed to save DB I/O (attributes not accessed before return)
             elif response_item.get('type') == 'text':
                 response_data = extract_json(response_item.get('text'))
     else:
@@ -365,14 +365,14 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
             current_subtask.status = SubtaskStatus.COMPLETED
             db.add(current_subtask)
             db.commit()
-            db.refresh(current_subtask)
+            # db.refresh(current_subtask) removed to save DB I/O (attributes not accessed before return)
 
         elif action_type == 'subtask_failed':
             # Mark plan, task, and thread as failed
             current_plan.status = ThreadTaskPlanStatus.FAILED
             db.add(current_plan)
             db.commit()
-            db.refresh(current_plan)
+            # db.refresh(current_plan) removed to save DB I/O (attributes not accessed before return)
 
             task.status = ThreadTaskStatus.FAILED
             db.add(task)
@@ -393,7 +393,7 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
             )
             db.add(ai_message)
             db.commit()
-            db.refresh(ai_message)
+            # db.refresh(ai_message) removed to save DB I/O (attributes not accessed before return)
 
         elif action_type == 'tool_use':
             tool = act['params'].get('tool')
@@ -416,6 +416,6 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
                 )
                 db.add(memory_entry)
                 db.commit()
-                db.refresh(memory_entry)
+                # db.refresh(memory_entry) removed to save DB I/O (attributes not accessed before return)
 
     return response_data

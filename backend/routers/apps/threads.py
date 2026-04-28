@@ -90,7 +90,7 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
     )
     db.add(user_message)
     db.commit()
-    db.refresh(user_message)
+    # db.refresh(user_message) removed to save DB I/O (attributes not accessed before return)
 
     response_data['thread_id'] = instance.id
 
@@ -104,7 +104,7 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
         )
         db.add(thread_task)
         db.commit()
-        db.refresh(thread_task)
+        # db.refresh(thread_task) removed to save DB I/O (attributes not accessed before return)
 
         ai_message = ThreadMessage(
             thread_id=instance.id,
@@ -131,7 +131,7 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
         )
         db.add(ai_message)
         db.commit()
-        db.refresh(ai_message)
+        # db.refresh(ai_message) removed to save DB I/O (attributes not accessed before return)
 
         return response_data
 
@@ -150,7 +150,7 @@ def update_thread(tid: str, update_obj: UpdateThread, db: Session = Depends(get_
     instance.title = update_obj.title
     db.add(instance)
     db.commit()
-    db.refresh(instance)
+    # db.refresh(instance) removed to save DB I/O (attributes not accessed before return)
 
     return {'message': 'Success'}
 
@@ -172,7 +172,7 @@ def delete_thread(tid: str, db: Session = Depends(get_session), user: User = Dep
     instance.status = ThreadStatus.DELETED
     db.add(instance)
     db.commit()
-    db.refresh(instance)
+    # db.refresh(instance) removed to save DB I/O (attributes not accessed before return)
 
     return {'message': 'Success'}
 
@@ -270,7 +270,7 @@ def cancel_running_task(tid: str, db: Session = Depends(get_session), user: User
     )
     db.add(ai_message)
     db.commit()
-    db.refresh(ai_message)
+    # db.refresh(ai_message) removed to save DB I/O (attributes not accessed before return)
 
     return {'message': 'Success'}
 
@@ -334,7 +334,7 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
     )
     db.add(user_message)
     db.commit()
-    db.refresh(user_message)
+    # db.refresh(user_message) removed to save DB I/O (attributes not accessed before return)
 
     if response_data.get('type') == 'desktop_task':
         thread_task = ThreadTask(
