@@ -117,18 +117,20 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
-        for i, subtask_item in enumerate(plan):
-            subtask = PlanSubtask(
+        # What: Consolidate database inserts for subtasks into a single operation
+        # Why: Prevents N+1 query problem where each subtask required a separate commit and refresh
+        # Impact: Significantly reduces database I/O overhead during plan creation, improving responsiveness
+        subtasks = [
+            PlanSubtask(
                 thread_task_plan_id=current_plan.id,
                 subtask_text=subtask_item.get('subtask'),
                 subtask_type=SubtaskType.DESKTOP,
-                # subtask_type=SubtaskType.DESKTOP if subtask_item.get(
-                #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
             )
-            db.add(subtask)
-            db.commit()
-            db.refresh(subtask)
+            for i, subtask_item in enumerate(plan)
+        ]
+        db.add_all(subtasks)
+        db.commit()
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
