@@ -117,18 +117,23 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
-        for i, subtask_item in enumerate(plan):
-            subtask = PlanSubtask(
+        # 💡 What: Batch inserts for PlanSubtask creation and commit once outside the loop.
+        # 🎯 Why: Avoids N+1 DB roundtrips (commit/refresh on each iteration) which unnecessarily bottlenecks plan creation.
+        # 📊 Impact: Reduces plan generation DB operations from O(N) to O(1), improving overall request latency.
+        subtasks_to_add = [
+            PlanSubtask(
                 thread_task_plan_id=current_plan.id,
                 subtask_text=subtask_item.get('subtask'),
                 subtask_type=SubtaskType.DESKTOP,
-                # subtask_type=SubtaskType.DESKTOP if subtask_item.get(
-                #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
             )
-            db.add(subtask)
+            for i, subtask_item in enumerate(plan)
+        ]
+        if subtasks_to_add:
+            db.add_all(subtasks_to_add)
             db.commit()
-            db.refresh(subtask)
+
+            # Optionally refresh them if needed downstream? We don't use the created `subtask` object directly below.
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
