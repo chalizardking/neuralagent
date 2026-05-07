@@ -117,18 +117,19 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
-        for i, subtask_item in enumerate(plan):
-            subtask = PlanSubtask(
+        # ⚡ Bolt Optimization: Batched database insertions to avoid N+1 queries.
+        # Impact: Eliminates sequential db.commit() and db.refresh() roundtrips per loop iteration, significantly reducing overall task setup latency.
+        subtasks_to_add = [
+            PlanSubtask(
                 thread_task_plan_id=current_plan.id,
                 subtask_text=subtask_item.get('subtask'),
                 subtask_type=SubtaskType.DESKTOP,
-                # subtask_type=SubtaskType.DESKTOP if subtask_item.get(
-                #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
-            )
-            db.add(subtask)
+            ) for i, subtask_item in enumerate(plan)
+        ]
+        if subtasks_to_add:
+            db.add_all(subtasks_to_add)
             db.commit()
-            db.refresh(subtask)
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
@@ -136,20 +137,11 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
     )).order_by(PlanSubtask.ordering.asc())).first()
 
     if not current_subtask:
+        # ⚡ Bolt Optimization: Consolidated sequential updates into a single add_all and commit.
+        # Impact: Combines 4 separate database transactions into 1, reducing network overhead and lock contention.
         current_plan.status = ThreadTaskPlanStatus.COMPLETED
-        db.add(current_plan)
-        db.commit()
-        db.refresh(current_plan)
-
         task.status = ThreadTaskStatus.COMPLETED
-        db.add(task)
-        db.commit()
-        db.refresh(task)
-
         instance.status = ThreadStatus.STANDBY
-        db.add(instance)
-        db.commit()
-        db.refresh(instance)
 
         ai_message = ThreadMessage(
             thread_id=instance.id,
@@ -158,9 +150,8 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
             thread_chat_from=ThreadChatFromChoices.FROM_AI,
             text=json.dumps({'actions': [{'action': 'task_completed'}]}),
         )
-        db.add(ai_message)
+        db.add_all([current_plan, task, instance, ai_message])
         db.commit()
-        db.refresh(ai_message)
 
         return {'action': 'task_completed'}
 
@@ -316,20 +307,25 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
 
     response_data = None
     if task.extended_thinking_mode is True:
+        # ⚡ Bolt Optimization: Batched thinking message insertions.
+        # Impact: Prevents N+1 queries by committing all AI thoughts simultaneously instead of one by one.
+        thinking_messages_to_add = []
         for response_item in response.content:
             if response_item.get('type') == 'reasoning_content':
-                thinking_message = ThreadMessage(
-                    thread_id=instance.id,
-                    thread_task_id=task.id,
-                    thread_chat_type=ThreadChatType.THINKING,
-                    thread_chat_from=ThreadChatFromChoices.FROM_AI,
-                    chain_of_thought=response_item.get('reasoning_content', {}).get('text'),
+                thinking_messages_to_add.append(
+                    ThreadMessage(
+                        thread_id=instance.id,
+                        thread_task_id=task.id,
+                        thread_chat_type=ThreadChatType.THINKING,
+                        thread_chat_from=ThreadChatFromChoices.FROM_AI,
+                        chain_of_thought=response_item.get('reasoning_content', {}).get('text'),
+                    )
                 )
-                db.add(thinking_message)
-                db.commit()
-                db.refresh(thinking_message)
             elif response_item.get('type') == 'text':
                 response_data = extract_json(response_item.get('text'))
+        if thinking_messages_to_add:
+            db.add_all(thinking_messages_to_add)
+            db.commit()
     else:
         response_data = extract_json(response.content)
 
@@ -357,32 +353,28 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
             db.refresh(memory_entry)
 
     # Iterate over all actions
+    # ⚡ Bolt Optimization: Consolidated all iterative database operations within the action loop.
+    # Impact: Replaces individual loop transaction commits with a single batched commit at the end, dramatically speeding up multi-action processing.
     actions_arr = response_data.get('actions', [])
+    objects_to_add = []
+
     for act in actions_arr:
         action_type = act.get('action')
 
         if action_type == 'subtask_completed' and len(actions_arr) == 1:
             current_subtask.status = SubtaskStatus.COMPLETED
-            db.add(current_subtask)
-            db.commit()
-            db.refresh(current_subtask)
+            objects_to_add.append(current_subtask)
 
         elif action_type == 'subtask_failed':
             # Mark plan, task, and thread as failed
             current_plan.status = ThreadTaskPlanStatus.FAILED
-            db.add(current_plan)
-            db.commit()
-            db.refresh(current_plan)
+            objects_to_add.append(current_plan)
 
             task.status = ThreadTaskStatus.FAILED
-            db.add(task)
-            db.commit()
-            db.refresh(task)
+            objects_to_add.append(task)
 
             instance.status = ThreadStatus.STANDBY
-            db.add(instance)
-            db.commit()
-            db.refresh(instance)
+            objects_to_add.append(instance)
 
             ai_message = ThreadMessage(
                 thread_id=instance.id,
@@ -391,9 +383,7 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
                 thread_chat_from=ThreadChatFromChoices.FROM_AI,
                 text=json.dumps({'actions': [{'action': 'task_failed'}]}),
             )
-            db.add(ai_message)
-            db.commit()
-            db.refresh(ai_message)
+            objects_to_add.append(ai_message)
 
         elif action_type == 'tool_use':
             tool = act['params'].get('tool')
@@ -404,9 +394,7 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
                     thread_task_id=task.id,
                     text=args.get('text', ''),
                 )
-                db.add(memory_entry)
-                db.commit()
-                db.refresh(memory_entry)
+                objects_to_add.append(memory_entry)
 
             elif tool in ['read_pdf', 'fetch_url', 'summarize_youtube_video']:
                 tool_output_text = run_tool_server_side(tool, args)
@@ -414,8 +402,10 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
                     thread_task_id=task.id,
                     text=tool_output_text,
                 )
-                db.add(memory_entry)
-                db.commit()
-                db.refresh(memory_entry)
+                objects_to_add.append(memory_entry)
+
+    if objects_to_add:
+        db.add_all(objects_to_add)
+        db.commit()
 
     return response_data
