@@ -117,18 +117,19 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
-        for i, subtask_item in enumerate(plan):
-            subtask = PlanSubtask(
+        # ⚡ Bolt Optimization: Batch insert subtasks instead of looping db.commit() and db.refresh()
+        # 💡 Why: Committing and refreshing on each iteration adds significant DB I/O overhead.
+        # 📊 Impact: O(1) DB inserts instead of O(N), vastly improving plan execution time for complex tasks.
+        subtasks = [
+            PlanSubtask(
                 thread_task_plan_id=current_plan.id,
                 subtask_text=subtask_item.get('subtask'),
                 subtask_type=SubtaskType.DESKTOP,
-                # subtask_type=SubtaskType.DESKTOP if subtask_item.get(
-                #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
-            )
-            db.add(subtask)
-            db.commit()
-            db.refresh(subtask)
+            ) for i, subtask_item in enumerate(plan)
+        ]
+        db.add_all(subtasks)
+        db.commit()
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
