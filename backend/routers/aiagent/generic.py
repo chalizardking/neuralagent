@@ -117,6 +117,10 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
+        # 💡 What: Batched database inserts for plan subtasks.
+        # 🎯 Why: Previously, db.commit() was called inside the loop, leading to N separate database transactions.
+        # 📊 Impact: Significantly reduces database I/O overhead and transaction latency when generating multi-step plans.
+        subtasks_to_add = []
         for i, subtask_item in enumerate(plan):
             subtask = PlanSubtask(
                 thread_task_plan_id=current_plan.id,
@@ -126,9 +130,12 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
                 #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
             )
-            db.add(subtask)
+            subtasks_to_add.append(subtask)
+
+        if subtasks_to_add:
+            db.add_all(subtasks_to_add)
             db.commit()
-            db.refresh(subtask)
+            # Note: We skip db.refresh() on each subtask as their attributes are not accessed again within this block.
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
