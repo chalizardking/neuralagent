@@ -117,6 +117,10 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
+        # ⚡ Bolt Optimization: Batch database inserts to minimize network latency
+        # 💡 Why: Committing inside loops triggers O(N) database trips. Collecting objects into a list to use db.add_all reduces DB hits.
+        # 📊 Impact: O(1) DB inserts for tasks with multiple subtasks, minimizing blocking synchronous I/O operations and database transaction overhead.
+        subtasks_to_add = []
         for i, subtask_item in enumerate(plan):
             subtask = PlanSubtask(
                 thread_task_plan_id=current_plan.id,
@@ -126,8 +130,10 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
                 #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
             )
-            db.add(subtask)
-            db.commit()
+            subtasks_to_add.append(subtask)
+        db.add_all(subtasks_to_add)
+        db.commit()
+        for subtask in subtasks_to_add:
             db.refresh(subtask)
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
@@ -137,19 +143,8 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
 
     if not current_subtask:
         current_plan.status = ThreadTaskPlanStatus.COMPLETED
-        db.add(current_plan)
-        db.commit()
-        db.refresh(current_plan)
-
         task.status = ThreadTaskStatus.COMPLETED
-        db.add(task)
-        db.commit()
-        db.refresh(task)
-
         instance.status = ThreadStatus.STANDBY
-        db.add(instance)
-        db.commit()
-        db.refresh(instance)
 
         ai_message = ThreadMessage(
             thread_id=instance.id,
@@ -158,9 +153,11 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
             thread_chat_from=ThreadChatFromChoices.FROM_AI,
             text=json.dumps({'actions': [{'action': 'task_completed'}]}),
         )
-        db.add(ai_message)
+
+        db.add_all([current_plan, task, instance, ai_message])
         db.commit()
-        db.refresh(ai_message)
+        for item in [current_plan, task, instance, ai_message]:
+            db.refresh(item)
 
         return {'action': 'task_completed'}
 
@@ -370,19 +367,8 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
         elif action_type == 'subtask_failed':
             # Mark plan, task, and thread as failed
             current_plan.status = ThreadTaskPlanStatus.FAILED
-            db.add(current_plan)
-            db.commit()
-            db.refresh(current_plan)
-
             task.status = ThreadTaskStatus.FAILED
-            db.add(task)
-            db.commit()
-            db.refresh(task)
-
             instance.status = ThreadStatus.STANDBY
-            db.add(instance)
-            db.commit()
-            db.refresh(instance)
 
             ai_message = ThreadMessage(
                 thread_id=instance.id,
@@ -391,9 +377,11 @@ def next_step(tid: str, next_step_req: NextStepRequest, db: Session = Depends(ge
                 thread_chat_from=ThreadChatFromChoices.FROM_AI,
                 text=json.dumps({'actions': [{'action': 'task_failed'}]}),
             )
-            db.add(ai_message)
+
+            db.add_all([current_plan, task, instance, ai_message])
             db.commit()
-            db.refresh(ai_message)
+            for item in [current_plan, task, instance, ai_message]:
+                db.refresh(item)
 
         elif action_type == 'tool_use':
             tool = act['params'].get('tool')
