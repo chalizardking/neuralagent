@@ -117,6 +117,11 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
         db.commit()
         db.refresh(current_plan)
 
+        # ⚡ Bolt Optimization: Consolidate DB insertions
+        # 💡 Why: Calling db.commit() inside a loop causes a separate database transaction per item, increasing latency linearly.
+        # 📊 Impact: O(1) DB transaction overhead instead of O(N). Significantly speeds up plan creation.
+        # 🔬 Measurement: Observe faster plan creation responses when task involves many subtasks.
+        subtasks_to_add = []
         for i, subtask_item in enumerate(plan):
             subtask = PlanSubtask(
                 thread_task_plan_id=current_plan.id,
@@ -126,9 +131,11 @@ def current_subtask_request(tid: str, current_subtask_request_obj: CurrentSubtas
                 #     'type') == 'desktop_subtask' else SubtaskType.BROWSER,
                 ordering=i + 1,
             )
-            db.add(subtask)
+            subtasks_to_add.append(subtask)
+
+        if subtasks_to_add:
+            db.add_all(subtasks_to_add)
             db.commit()
-            db.refresh(subtask)
 
     current_subtask = db.exec(select(PlanSubtask).where(and_(
         PlanSubtask.status == SubtaskStatus.ACTIVE,
