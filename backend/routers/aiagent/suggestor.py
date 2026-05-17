@@ -30,9 +30,10 @@ def get_suggestions(request: SuggestorRequest, db: Session = Depends(get_session
         {"type": "text", "text": f"Current Running Apps: {json.dumps(request.current_running_apps)}"},
     ]
 
-    most_recent_tasks = db.exec(select(ThreadTask).where(and_(
-        ThreadTask.thread.has(Thread.user_id == user.id),
-        ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
+    # ⚡ Bolt Optimization: Replaced correlated EXISTS subqueries (.has()) with JOIN for better execution plan
+    most_recent_tasks = db.exec(select(ThreadTask).join(Thread).where(and_(
+        Thread.user_id == user.id,
+        Thread.status != ThreadStatus.DELETED,
     )).order_by(ThreadTask.created_at.desc()).limit(20)).all()
     most_recent_tasks_arr = []
     for recent_task in most_recent_tasks:

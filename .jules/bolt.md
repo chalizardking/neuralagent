@@ -1,3 +1,6 @@
 ## 2024-05-24 - [Avoid `len(query.all()) > 0` for SQLModel existence checks]
 **Learning:** Checking for existence using `len(query.all()) > 0` in SQLModel/SQLAlchemy will fully execute the query and load all matching models into memory, leading to an N+1 memory footprint. Also learned from codebase context that calling `.first()` on the result object without `.limit(1)` in this setup fails to prevent full database queries.
 **Action:** Always append `.limit(1)` to the `select()` statement before execution (e.g., `db.exec(select(...).limit(1)).first() is not None`) to ensure the DB limits the scan natively.
+## 2026-05-18 - Optimized SQLModel Relationship Filtering
+**Learning:** Using SQLModel's/SQLAlchemy's `.has()` method generates correlated `EXISTS` subqueries, which can perform poorly compared to explicitly using `.join()`. Because these models represent many-to-one relationships, `.join()` is safe from row duplication and significantly faster. For update queries where `.join()` isn't supported across all SQL dialects, using `.in_()` with a subquery is the proper optimization.
+**Action:** Always prefer explicit `.join()` operations instead of `.has()` relationship filtering for improved execution plans and performance when filtering based on related objects.
