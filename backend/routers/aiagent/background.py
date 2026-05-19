@@ -46,9 +46,9 @@ def next_step(tid: str, next_step_req: BackgroundNextStepRequest, db: Session = 
     else:
         llm = llm_provider.get_llm(agent='computer_use', temperature=0.0)
 
-    previous_tasks = db.exec(select(ThreadTask).where(and_(
-        ThreadTask.thread.has(Thread.user_id == user.id),
-        ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
+    previous_tasks = db.exec(select(ThreadTask).join(Thread).where(and_(
+        Thread.user_id == user.id,
+        Thread.status != ThreadStatus.DELETED,
     )).order_by(ThreadTask.created_at.desc()).limit(10)).all()
     previous_tasks_arr = []
     for previous_task in previous_tasks:
@@ -86,9 +86,9 @@ def next_step(tid: str, next_step_req: BackgroundNextStepRequest, db: Session = 
         action_history.append(previous_action_dict)
 
     if task.needs_memory_from_previous_tasks is True:
-        tasks_for_memory = db.exec(select(ThreadTask).where(and_(
-            ThreadTask.thread.has(Thread.user_id == user.id),
-            ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
+        tasks_for_memory = db.exec(select(ThreadTask).join(Thread).where(and_(
+            Thread.user_id == user.id,
+            Thread.status != ThreadStatus.DELETED,
         )).order_by(ThreadTask.created_at.desc()).limit(5)).all()
         tasks_for_memory_ids = [task.id for task in tasks_for_memory]
         memory_items = db.exec(
