@@ -46,9 +46,9 @@ def create_thread(create_thread_obj: CreateThread, db: Session = Depends(get_ses
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
 
-    previous_tasks = db.exec(select(ThreadTask).where(and_(
-        ThreadTask.thread.has(Thread.user_id == user.id),
-        ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
+    previous_tasks = db.exec(select(ThreadTask).join(Thread).where(and_(
+        Thread.user_id == user.id,
+        Thread.status != ThreadStatus.DELETED,
     )).order_by(ThreadTask.created_at.desc()).limit(10)).all()
     previous_tasks_arr = []
     for previous_task in previous_tasks:
@@ -193,10 +193,11 @@ def retrieve_thread(tid: str, db: Session = Depends(get_session), user: User = D
 
 @router.get('/{tid}/thread_messages', response_model=List[ListThreadMessage])
 def thread_messages(tid: str, db: Session = Depends(get_session), user: User = Depends(get_current_user_dependency)):
-    query = select(ThreadMessage).where(and_(
+    from sqlalchemy.orm import selectinload
+    query = select(ThreadMessage).join(Thread).where(and_(
         ThreadMessage.thread_id == tid,
-        ThreadMessage.thread.has(Thread.user_id == user.id),
-    )).order_by(ThreadMessage.created_at.asc())
+        Thread.user_id == user.id,
+    )).order_by(ThreadMessage.created_at.asc()).options(selectinload(ThreadMessage.thread_task))
     return db.exec(query)
 
 
@@ -257,9 +258,11 @@ def cancel_running_task(tid: str, db: Session = Depends(get_session), user: User
             status=ThreadTaskPlanStatus.CANCELED,
         ))
 
-        db.exec(update(PlanSubtask).where(PlanSubtask.plan.has(ThreadTaskPlan.thread_task_id == running_task.id)).values(
-            status=SubtaskStatus.CANCELED,
-        ))
+        db.exec(update(PlanSubtask).where(
+            PlanSubtask.thread_task_plan_id.in_(
+                select(ThreadTaskPlan.id).where(ThreadTaskPlan.thread_task_id == running_task.id)
+            )
+        ).values(status=SubtaskStatus.CANCELED))
 
     ai_message = ThreadMessage(
         thread_id=instance.id,
@@ -299,9 +302,9 @@ def send_message(tid: str, obj: SendMessageObj, db: Session = Depends(get_sessio
 
     llm = llm_provider.get_llm(agent='classifier', temperature=0.1)
 
-    previous_tasks = db.exec(select(ThreadTask).where(and_(
-        ThreadTask.thread.has(Thread.user_id == user.id),
-        ThreadTask.thread.has(Thread.status != ThreadStatus.DELETED),
+    previous_tasks = db.exec(select(ThreadTask).join(Thread).where(and_(
+        Thread.user_id == user.id,
+        Thread.status != ThreadStatus.DELETED,
     )).order_by(ThreadTask.created_at.desc()).limit(10)).all()
     previous_tasks_arr = []
     for previous_task in previous_tasks:
